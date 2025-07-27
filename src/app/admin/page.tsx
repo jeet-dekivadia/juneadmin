@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { 
   Search, 
   RefreshCw, 
   Lightbulb,
-  Download,
   Eye,
   ChevronUp, 
   ChevronDown,
@@ -15,7 +14,7 @@ import {
   X
 } from 'lucide-react'
 import { format, parseISO, subDays, subMonths, subWeeks, subHours, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInDays, differenceInHours } from 'date-fns'
-import { BarChart, Bar, LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface WaitlistEntry {
   id: number
@@ -35,8 +34,6 @@ interface WaitlistEntry {
   updated_at: string
 }
 
-const COLORS = ['#000000', '#333333', '#666666', '#999999', '#cccccc']
-
 export default function AdminDashboard() {
   const [waitlistData, setWaitlistData] = useState<WaitlistEntry[]>([])
   const [filteredData, setFilteredData] = useState<WaitlistEntry[]>([])
@@ -53,22 +50,7 @@ export default function AdminDashboard() {
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    const hasAccess = localStorage.getItem('juneAdminAccess')
-    if (!hasAccess) {
-      router.push('/')
-      return
-    }
-
-    fetchWaitlistData()
-    setupRealtimeSubscription()
-  }, [])
-
-  useEffect(() => {
-    applyFiltersAndSearch()
-  }, [waitlistData, searchTerm])
-
-  const fetchWaitlistData = async () => {
+  const fetchWaitlistData = useCallback(async () => {
     try {
       setIsLoading(true)
       const { data, error, count } = await supabase
@@ -88,9 +70,9 @@ export default function AdminDashboard() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [supabase])
 
-  const setupRealtimeSubscription = () => {
+  const setupRealtimeSubscription = useCallback(() => {
     const channel = supabase
       .channel('waitlist_changes')
       .on(
@@ -110,10 +92,10 @@ export default function AdminDashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }
+  }, [supabase, fetchWaitlistData])
 
-  const applyFiltersAndSearch = () => {
-    let filtered = waitlistData.filter(entry => {
+  const applyFiltersAndSearch = useCallback(() => {
+    const filtered = waitlistData.filter(entry => {
       const matchesSearch = searchTerm === '' || 
         Object.values(entry).some(value => 
           value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
@@ -133,7 +115,22 @@ export default function AdminDashboard() {
     }
 
     setFilteredData(filtered)
-  }
+  }, [waitlistData, searchTerm, sortConfig])
+
+  useEffect(() => {
+    const hasAccess = localStorage.getItem('juneAdminAccess')
+    if (!hasAccess) {
+      router.push('/')
+      return
+    }
+
+    fetchWaitlistData()
+    setupRealtimeSubscription()
+  }, [router, fetchWaitlistData, setupRealtimeSubscription])
+
+  useEffect(() => {
+    applyFiltersAndSearch()
+  }, [applyFiltersAndSearch])
 
   const handleSort = (key: keyof WaitlistEntry) => {
     setSortConfig(prevConfig => ({
@@ -205,11 +202,6 @@ export default function AdminDashboard() {
     const now = new Date()
     const today = startOfDay(now)
     const yesterday = subDays(today, 1)
-    const lastWeek = subWeeks(now, 1)
-    const lastMonth = subMonths(now, 1)
-    const last3Months = subMonths(now, 3)
-    const last6Months = subMonths(now, 6)
-    const lastYear = subMonths(now, 12)
     const thisWeek = startOfWeek(now)
     const thisMonth = startOfMonth(now)
     const thisYear = startOfYear(now)
@@ -287,13 +279,11 @@ export default function AdminDashboard() {
     const usersWithLinkedIn = waitlistData.filter(e => e.linkedin && e.linkedin.trim() !== '').length
     const usersWithTwitter = waitlistData.filter(e => e.twitter && e.twitter.trim() !== '').length
     const usersWithAllSocial = waitlistData.filter(e => e.instagram && e.linkedin && e.twitter).length
-    const usersWithNoSocial = waitlistData.filter(e => !e.instagram && !e.linkedin && !e.twitter).length
 
     // Completion rates
     const emailCompletionRate = (usersWithEmail / totalUsers * 100)
     const phoneCompletionRate = (usersWithPhone / totalUsers * 100)
     const nameCompletionRate = (usersWithName / totalUsers * 100)
-    const socialCompletionRate = ((usersWithInstagram + usersWithLinkedIn + usersWithTwitter) / (totalUsers * 3) * 100)
 
     // Time-based analytics
     const hourlyDistribution = Array.from({length: 24}, (_, hour) => {
@@ -329,10 +319,6 @@ export default function AdminDashboard() {
         daily: dailyCount
       })
     }
-
-    // Additional metrics
-    const averageTimeToJoin = totalUsers > 1 ? 
-      differenceInHours(new Date(waitlistData[0]?.created_at), new Date(waitlistData[waitlistData.length - 1]?.created_at)) / totalUsers : 0
 
     const recentUsers = waitlistData.filter(entry => new Date(entry.created_at) >= subHours(now, 1)).length
     const dormantPeriods = growthData.filter(day => day.daily === 0).length
@@ -396,13 +382,11 @@ export default function AdminDashboard() {
       usersWithLinkedIn,
       usersWithTwitter,
       usersWithAllSocial,
-      usersWithNoSocial,
       emailCompletionRate,
       phoneCompletionRate,
 
       // Additional completion rates (4)
       nameCompletionRate,
-      socialCompletionRate,
       usersWithAccessCode: waitlistData.filter(e => e.access_code && e.access_code.trim() !== '').length,
       completeProfiles: waitlistData.filter(e => e.name && e.email && e.phone && e.age).length,
 
@@ -411,7 +395,6 @@ export default function AdminDashboard() {
       peakHour,
       dayOfWeekDistribution,
       peakDay,
-      averageTimeToJoin,
       growthData
     }
   }
