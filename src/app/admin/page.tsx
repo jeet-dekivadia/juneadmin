@@ -13,8 +13,11 @@ import {
   Menu,
   X
 } from 'lucide-react'
-import { format, parseISO, subDays, subMonths, subWeeks, subHours, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInDays, differenceInHours } from 'date-fns'
+import { format, parseISO, subDays, subMonths, subWeeks, subHours, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInDays } from 'date-fns'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+
+// Force dynamic rendering to prevent static generation with Supabase
+export const dynamic = 'force-dynamic'
 
 interface WaitlistEntry {
   id: number
