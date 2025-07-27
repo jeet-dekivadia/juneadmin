@@ -62,14 +62,15 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Error fetching waitlist data:', error)
+        // Silently handle error for security
+        setIsLoading(false)
         return
       }
 
       setWaitlistData(data || [])
       setTotalEntries(count || 0)
     } catch (error) {
-      console.error('Error:', error)
+      // Silently handle error for security
     } finally {
       setIsLoading(false)
     }
@@ -86,7 +87,7 @@ export default function AdminDashboard() {
           table: 'waitlist'
         },
         (payload) => {
-          console.log('Real-time update:', payload)
+          // Real-time update received - refresh data
           fetchWaitlistData()
         }
       )
@@ -121,8 +122,14 @@ export default function AdminDashboard() {
   }, [waitlistData, searchTerm, sortConfig])
 
   useEffect(() => {
-    const hasAccess = localStorage.getItem('juneAdminAccess')
-    if (!hasAccess) {
+    // Multi-layer security check
+    const hasLocalAccess = localStorage.getItem('juneAdminAccess')
+    const hasSessionCookie = document.cookie.includes('june-admin-session=authenticated-junedating-2025')
+    
+    if (!hasLocalAccess || !hasSessionCookie) {
+      // Clear any partial session data
+      localStorage.removeItem('juneAdminAccess')
+      document.cookie = 'june-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       router.push('/')
       return
     }
@@ -170,7 +177,7 @@ export default function AdminDashboard() {
       }
       setShowMobileMenu(false)
     } catch (error) {
-      console.error('Export error:', error)
+      // Silently handle export error
       alert('Export failed. Please try again.')
     }
   }
@@ -185,10 +192,13 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     try {
+      // Clear all session data
       localStorage.removeItem('juneAdminAccess')
+      document.cookie = 'june-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       router.push('/')
     } catch (error) {
-      console.error('Logout error:', error)
+      // Remove console.log for security
+      router.push('/')
     }
   }
 

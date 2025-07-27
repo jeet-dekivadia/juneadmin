@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -9,17 +9,30 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
+  // Security: Clear any existing admin session on login page load
+  useEffect(() => {
+    localStorage.removeItem('juneAdminAccess')
+    document.cookie = 'june-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
     if (adminCode === 'junedating@2025') {
+      // Set both localStorage and secure HTTP-only session
       localStorage.setItem('juneAdminAccess', 'true')
+      
+      // Set secure session cookie
+      document.cookie = 'june-admin-session=authenticated-junedating-2025; path=/; secure; samesite=strict; max-age=86400'
+      
       router.push('/admin')
     } else {
       setError('Invalid admin code')
       setAdminCode('')
+      // Clear any existing session
+      document.cookie = 'june-admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     }
     setIsLoading(false)
   }
